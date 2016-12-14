@@ -3,6 +3,7 @@ from whoosh.fields import *
 from whoosh.index import create_in,open_dir
 from whoosh.qparser import QueryParser
 from whoosh.analysis import RegexAnalyzer,Tokenizer,Token
+from whoosh import  scoring
 import jieba
 import os
 from flask import Flask,request,render_template
@@ -52,22 +53,27 @@ def index_create():
             path2=os.path.join(root,file)
             with open(path2,'r')as f:
                 content2=f.read()
-                title2=f.readlines()[0]
+                title2=content2.split('\n')[0]
+
+
             writer.add_document(title=title2,path='auto.sohu.com/'+path2[6:].replace('|','/')+'.shtml',content = content2)
     writer.commit()
 def index_open(word):
     resultslist=[]
     ix = open_dir('indexer')
-    with ix.searcher() as search:
+    with ix.searcher(weighting=scoring.TF_IDF()) as search:
         # 查询时候用精确模式分词?
         parser=QueryParser('content',ix.schema).parse(word)
         print(parser)
+        # 最多30个结果
         results=search.search(parser,limit=30)
+        # 每个结果最多300个字符
+        results.fragmenter.charlimit = 200
         for i in results:
             # 匹配高亮
-            print(i.highlights('content'))
-            print('---')
-            resultslist.append((i['path'],i['title'],i.highlights('content')))
+            print(i.highlights('content').replace(r'">','" color="red">'))
+
+            resultslist.append((i['path'],i['title'],i.highlights('content').replace(r'">','" style="color:red">')))
     return resultslist
 def data_preprocessing():
     for root,dirs,files in os.walk('data/'):
@@ -89,6 +95,7 @@ def data_preprocessing():
 
 
 if __name__ == '__main__':
-    # app.run()
-    index_open('中国')
+    app.run()
+    # index_open('好车')
     # index_create()
+
